@@ -1,11 +1,20 @@
-# 1. Ignore absolutely everything by default
-*
+# Ignore local environment cache blocks
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
 
-# 2. Allow specific folders and files you NEED
-!src/
-!public/
-!package.json
-!package-lock.json
-!requirements.txt
-!next.config.js
-!Dockerfile
+# Ignore local git histories
+.git
+.gitignore
+
+# Ignore local system/IDE layouts
+.DS_Store
+.idea/
+.vscode/
+
+# DO NOT ignore app.py, templates, requirements.txt, or init.sql!
