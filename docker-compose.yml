@@ -1,0 +1,67 @@
+# docker-compose.yml
+# Orchestrates the Flask app and MySQL database together
+# Run with:       docker compose up --build
+# Stop with:      docker compose down
+# Stop & wipe:    docker compose down -v
+
+# name: devops-login # Optional project name. If omitted, Docker Compose uses the current directory name.
+
+services:
+  # MySQL Database Service
+  db:
+    image: mysql:8.0
+    container_name: training-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: trainingdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD: apppassword
+    ports:
+      - "3307:3306" # Host port 3307 -> container port 3306 (avoids local port clashes)
+    volumes:
+      # Persist DB data in a named volume
+      - mysql_data:/var/lib/mysql
+      # Auto-runs init.sql script on the first initialization
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+
+  # Flask Web App Service
+  web:
+    build: .
+    container_name: training-web
+    restart: unless-stopped
+    ports:
+      - "5000:5000" # Browser hits localhost:5000 -> container:5000
+    environment:
+      DB_HOST: db   # Service name 'db' resolves via Docker DNS
+      DB_PORT: 3306 # Internal container port (NOT the mapped 3307 host port)
+      DB_USER: appuser
+      DB_PASSWORD: apppassword
+      DB_NAME: trainingdb
+      SECRET_KEY: "change-me-in-production-please"
+    depends_on:
+      db:
+        condition: service_healthy # Wait until MySQL healthcheck passes before booting
+    networks:
+      - app-network
+
+# Named volume for persistent DB storage
+# Lives in Docker's managed storage, survives docker compose down
+# (but is removed by docker compose down -v)
+volumes:
+  mysql_data:
+
+# Private network
+# Both services join this network and can reach each other by service name
+networks:
+  app-network:
+    driver: bridge

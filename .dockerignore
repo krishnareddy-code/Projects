@@ -1,0 +1,11 @@
+# 1. Ignore absolutely everything by default
+*
+
+# 2. Allow specific folders and files you NEED
+!src/
+!public/
+!package.json
+!package-lock.json
+!requirements.txt
+!next.config.js
+!Dockerfile
