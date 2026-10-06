@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  web:
+    # Fixed to your true correct Docker Hub image path
+    image: krishna98967/devops-login-app:latest  
+    ports:
+      - "5000:5000"
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_USER: appuser
+      DB_NAME: trainingdb
+      DB_PASSWORD: apppassword 
+      SECRET_KEY: "my-secret"
+    networks:
+      - app-net
+    deploy:                           
+      replicas: 3                     
+      update_config:
+        parallelism: 1                
+        delay: 10s
+        order: start-first            
+      restart_policy:
+        condition: on-failure
+      placement:
+        constraints:
+          - node.role == worker       
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+      MYSQL_DATABASE: trainingdb
+      MYSQL_USER: appuser
+      MYSQL_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - app-net
+    secrets:
+      - db_password
+      - mysql_root_password
+    deploy:
+      replicas: 1                     
+      placement:
+        constraints:
+          - node.role == manager      
+
+volumes:
+  mysql_data:
+
+networks:
+  app-net:
+    driver: overlay                   
+
+secrets:
+  db_password:
+    external: true                    
+  mysql_root_password:
+    external: true                    

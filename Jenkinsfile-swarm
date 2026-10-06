@@ -1,0 +1,80 @@
+pipeline {
+    agent any
+
+    environment {
+        // Your verified repository details
+        DOCKERHUB_USER   = 'krishna98967'
+        IMAGE_NAME       = 'devops-login-app'
+        IMAGE_TAG        = "${BUILD_NUMBER}"
+        FULL_IMAGE       = "${DOCKERHUB_USER}/${IMAGE_NAME}:${IMAGE_TAG}"
+    }
+
+    stages {
+        // ---------- Stage 1: Pull from GitHub ----------
+        stage('Checkout') {
+            steps {
+                echo "🔄 Pulling code from git repository..."
+                checkout scm
+            }
+        }
+
+        // ---------- Stage 2: Build & Tag Image ----------
+        stage('Build Image') {
+            steps {
+                echo "🏗️ Building image version ${IMAGE_TAG}..."
+                sh "docker build -t ${FULL_IMAGE} -t ${DOCKERHUB_USER}/${IMAGE_NAME}:latest ."
+            }
+        }
+
+        // ---------- Stage 3: Push to Registry ----------
+        stage('Push to Docker Hub') {
+            steps {
+                echo "📤 Authenticating and pushing to Docker Hub..."
+                withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh '''
+                        echo "$PASS" | docker login -u "$USER" --password-stdin
+                        docker push ${FULL_IMAGE}
+                        docker push ${DOCKERHUB_USER}/${IMAGE_NAME}:latest
+                        docker logout
+                    '''
+                }
+            }
+        }
+
+        // ---------- Stage 4: Automate Swarm Deployment ----------
+        stage('Deploy to Swarm Lab') {
+            steps {
+                echo "🚀 Deploying stack update to virtual Manager node..."
+                sh '''
+                    # 1. Safely copy your updated docker-stack.yml file INTO the node1 container
+                    docker cp docker-stack.yml node1:/docker-stack.yml
+
+                    # 2. Check if the external secrets exist inside node1; create them if missing
+                    docker exec node1 sh -c 'docker secret inspect db_password >/dev/null 2>&1 || echo "apppassword" | docker secret create db_password -'
+                    docker exec node1 sh -c 'docker secret inspect mysql_root_password >/dev/null 2>&1 || echo "rootpassword" | docker secret create mysql_root_password -'
+
+                    # 3. Trigger the zero-downtime rolling update directly inside the manager node
+                    docker exec node1 docker stack deploy -c /docker-stack.yml login-system
+                '''
+            }
+        }
+
+        // ---------- Stage 5: Health check Verification ----------
+        stage('Verify Swarm Tasks') {
+            steps {
+                echo "✅ Verifying running replicas..."
+                sh '''
+                    sleep 15
+                    docker exec node1 docker stack ps login-system
+                '''
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo "🧹 Cleaning unused local disk image layers..."
+            sh 'docker image prune -f || true'
+        }
+    }
+}

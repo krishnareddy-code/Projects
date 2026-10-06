@@ -65,3 +65,13 @@ volumes:
 networks:
   app-network:
     driver: bridge
+
+docker compose ps
+
+docker compose -p pythonloginpage ps
+
+docker compose -p pythonloginpage logs -f
+
+docker compose -p pythonloginpage down
+
+
